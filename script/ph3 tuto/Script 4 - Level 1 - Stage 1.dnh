@@ -1,0 +1,170 @@
+#TouhouDanmakufu[Single]
+#ScriptVersion[3]+
+#Title["Fourth Level - Rumia Test"]
+#Text["Code by xChumbo. [r] Scripting"]
+
+#include "script/default_system/Default_ShotConst.txt"
+#include "./lib/lib_general.dnh"
+
+let objBoss;
+let objScene = GetEnemyBossSceneObjectID();
+let count = 0;
+
+@Event {
+  alternative (GetEventType())
+  case (EV_REQUEST_LIFE) {
+    SetScriptResult(3000);
+  }
+  case (EV_REQUEST_TIMER) {
+    SetScriptResult(70);
+  }
+  case (EV_REQUEST_SPELL_SCORE){
+    SetScriptResult(1000000);
+  }
+}
+
+@Initialize {
+  objBoss = ObjEnemy_Create(OBJ_ENEMY_BOSS);
+  ObjEnemy_Regist(objBoss);
+
+  ObjMove_SetDestAtFrame(objBoss, GetCenterX, 60, 60);
+
+  ObjEnemyBossScene_StartSpell(objScene);
+
+  TDrawLoop;
+  TFinalize;
+  MainTask;
+
+}
+
+task TDrawLoop {
+  let imgExRumia = GetCurrentScriptDirectory() ~ "./images/ExRumia.png";
+  ObjPrim_SetTexture(objBoss, imgExRumia);
+  ObjSprite2D_SetSourceRect(objBoss, 64, 1, 127, 64);
+  ObjSprite2D_SetDestCenter(objBoss);
+}
+
+@MainLoop {
+  ObjEnemy_SetIntersectionCircleToShot(objBoss, ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 32);
+  ObjEnemy_SetIntersectionCircleToPlayer(objBoss, ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 24);
+  if(count == 0){
+    ascent(i in 0..6) {CreateShikiA1B(i, 6, 1, 48);}
+  }
+  count++;
+  yield;
+}
+
+task TFinalize {
+  while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+    yield;
+  }
+  if (ObjEnemyBossScene_GetInfo(objScene, INFO_PLAYER_SHOOTDOWN_COUNT)
+       + ObjEnemyBossScene_GetInfo(objScene, INFO_PLAYER_SPELL_COUNT) == 0){
+          AddScore(ObjEnemyBossScene_GetInfo(objScene, INFO_SPELL_SCORE));
+        }
+  
+  Obj_Delete(objBoss);
+  DeleteShotAll(TYPE_ALL, TYPE_IMMEDIATE);
+  SetAutoDeleteObject(true);
+  CloseScript(GetOwnScriptID());
+  return;  
+}
+
+task MainTask {
+
+  wait(120);
+  movementTripod;
+  //shootElipse;
+
+
+}
+
+task movementTriangle {
+  let moveX = GetCenterX();
+  let moveY = GetCenterY();
+  while (ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0) {
+    ObjMove_SetDestAtFrame(objBoss, moveX / 2, moveY / 2, 60);
+    wait(90);
+    ObjMove_SetDestAtFrame(objBoss, GetCenterX(), 60 , 60);
+    wait(90);
+    ObjMove_SetDestAtFrame(objBoss, moveX * 1.5, moveY / 2, 60);
+    wait(90);
+  }
+}
+
+task movementTripod {
+  let moveX = GetCenterX();
+  let moveY = GetCenterY();
+  while (ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0) {
+    ObjMove_SetDestAtFrame(objBoss, moveX / 2, moveY / 2, 60);
+    wait(90);
+    ObjMove_SetDestAtFrame(objBoss, moveX, 60 , 60);
+    wait(90);
+    ObjMove_SetDestAtFrame(objBoss, moveX * 1.5, moveY / 2, 60);
+    wait(90);
+    ObjMove_SetDestAtFrame(objBoss, moveX, 60, 60);
+    wait(90);
+    ObjMove_SetDestAtFrame(objBoss, moveX, 120, 60);
+    wait(90);
+    ObjMove_SetDestAtFrame(objBoss, moveX, 60, 60);
+    wait(90);
+  }
+}
+
+task shootClockKunais {
+  let angleLeft = 180;
+  let angleRight = 0;
+  while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){ 
+    loop (10) {
+      if(Obj_IsDeleted(objBoss)){return;}
+      CreateShotA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 3, angleLeft, DS_KUNAI_BLUE, 2);
+      yield;;
+      angleLeft +=10;
+    }
+    loop (10){
+      if(Obj_IsDeleted(objBoss)){return;}
+      CreateShotA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 3, angleRight, DS_KUNAI_BLUE, 2);
+      yield;
+      angleRight += 10;
+    }
+  }
+}
+
+task shootElipse {
+  while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+    let angleT = 0;
+    loop (30){
+      CreateShotA1(ObjMove_GetX(objBoss) + 75*cos(angleT), ObjMove_GetY(objBoss) + 30*sin(angleT), 3, angleT, DS_STAR_M_GREEN, 2);
+      angleT += 360/30;
+    }
+    wait(30);
+  }
+}
+
+task CreateShikiA1B(ID, num, dir, rad) {
+  let objcount = 0; //counter to control firing of bullets and movement
+  let angleO = ID*360/num; //Initial angle (will be updated)
+  //obtain object ID
+  let obj = CreateShotA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 0, ID*360/num, 29, 0); 
+  //If using a bullet as a familiar, ensure it doesn't get accidentally deleted
+  ObjShot_SetSpellResist(obj, true); 
+  ObjShot_SetAutoDelete(obj, false);
+  while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0) { //linked to the parent enemy's life
+      //ID*360/num sets the angle relative to the other familiars. objcount*dir handles the rotation
+      angleO = ID*360/num + objcount*dir; //Update angle
+      ObjMove_SetPosition(obj, ObjMove_GetX(objBoss) + rad*cos(angleO), 
+                               ObjMove_GetY(objBoss) + rad*sin(angleO)); 
+      ObjMove_SetAngle(obj, angleO); 
+      if (objcount % 12 == 0) { //control firing rate
+          let currx = ObjMove_GetX(obj);
+          let curry = ObjMove_GetY(obj);
+          ascent(i in 0..3) {
+              CreateShotA1(currx, curry, 1.5, angleO + 180 + i * 120, 5, 0);
+              CreateShotA1(currx, curry, 1.5, angleO, DS_KNIFE_YOUMU_BLUE	, 2);
+          }
+      }
+      objcount++;
+      yield;
+  }
+  ObjShot_FadeDelete(obj);
+}

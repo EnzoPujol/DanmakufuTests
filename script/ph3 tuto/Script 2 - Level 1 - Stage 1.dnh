@@ -1,0 +1,193 @@
+#TouhouDanmakufu[Single]
+#ScriptVersion[3]
+#Title["Second Level - Rumia Test"]
+#Text["Code by xChumbo. [r] Scripting"] 
+
+#include "script/default_system/Default_ShotConst.txt"
+#include "./lib/lib_general.dnh"
+
+let objBoss;
+let objScene = GetEnemyBossSceneObjectID();
+
+@Event{
+  alternative (GetEventType())
+  case (EV_REQUEST_LIFE) {
+    SetScriptResult(2000);
+  }
+  case (EV_REQUEST_TIMER) {
+    SetScriptResult(80);
+  }
+  case (EV_REQUEST_SPELL_SCORE){
+    SetScriptResult(1000000);
+  }
+}
+
+@Initialize {
+  
+  objBoss = ObjEnemy_Create(OBJ_ENEMY_BOSS);
+  ObjEnemy_Regist(objBoss);
+
+  ObjMove_SetDestAtFrame(objBoss, GetCenterX(), 60, 60);
+
+  ObjEnemyBossScene_StartSpell(objScene);
+
+  TDrawLoop;
+  TFinalize;
+  MagicCircle;
+  MainTask;
+}
+
+task TDrawLoop {
+  let imgExRumia = GetCurrentScriptDirectory() ~ "./images/ExRumia.png";
+  ObjPrim_SetTexture(objBoss, imgExRumia);
+  ObjSprite2D_SetSourceRect(objBoss, 64, 1, 127, 64);
+  ObjSprite2D_SetDestCenter(objBoss);
+}
+
+@MainLoop {
+  ObjEnemy_SetIntersectionCircleToShot(objBoss, ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 32);
+  ObjEnemy_SetIntersectionCircleToPlayer(objBoss, ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 24);
+  yield;
+}
+
+task TFinalize {
+  while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+    yield;
+  }
+  if (ObjEnemyBossScene_GetInfo(objScene, INFO_PLAYER_SHOOTDOWN_COUNT) 
+        + ObjEnemyBossScene_GetInfo(objScene, INFO_PLAYER_SPELL_COUNT) == 0){
+          AddScore(ObjEnemyBossScene_GetInfo(objScene, INFO_SPELL_SCORE));
+        }
+  
+  Obj_Delete(objBoss);
+  DeleteShotAll(TYPE_ALL, TYPE_IMMEDIATE);
+  SetAutoDeleteObject(true);
+  CloseScript(GetOwnScriptID());
+  return;  
+}
+
+task MainTask {
+  wait(120);
+  movementHourGlass;
+  shootKunaiRing;
+  shootLaser;
+}
+
+task movementHourGlass {
+  while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+    let moveX = GetCenterX + 120;
+    let moveY = GetCenterY;
+    loop (2){
+      ObjMove_SetDestAtFrame(objBoss, moveX, moveY, 120);
+      wait(120);
+      moveX -= 240;
+      ObjMove_SetDestAtFrame(objBoss, moveX, moveY, 120);
+      wait(120);
+      moveY -= 120;
+      moveX +=240;
+    }
+  }
+}
+
+task shootKunaiRing {
+  while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+    let angleT = 0;
+    loop (10){
+      ascent (i in 0..2) {
+        CreateShotA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 3, angleT, DS_BUTTERFLY_PURPLE, 2);
+        angleT += 360/10;
+      }
+    }
+    wait(30);
+  }
+}
+
+task shootLaser {
+  while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+    CreateLooseLaserA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 2, GetAngleToPlayer(objBoss), 150, 12, DS_BALL_M_BLUE, 2);
+    wait(120);
+  }
+}
+
+task RenderBG {
+  let obj = ObjPrim_Create(OBJ_SPRITE_2D);
+  let imgpath = GetCurrentScriptDirectory() ~ "./background/u2l13sample.png";
+
+  ObjPrim_SetTexture(obj, imgpath);
+  ObjSprite2D_SetSourceRect(obj, 0, 1, 383, 448); //alternatively, 0, 0, 384, 448
+  ObjSprite2D_SetDestRect(obj, 0, 0, 384, 448);
+  ObjRender_SetPosition(obj, 0, 0, 0); //move it to the top left corner of the screen
+
+}
+
+task MagicCircle {
+    let imgpath = GetCurrentScriptDirectory() ~ "./images/magic-circle-example.png"; // Path for the texture to use
+    let NUM_VERTEX = 32; // Number of vertices we will use for this Magic Circle. 
+    // 32 vertices => 15 edges on the outside, as the last two vertices are duplicated over the first two to close the ring.
+    let MC_RADIUS = 96; // Maximum radius of our Magic Circle, in pixels
+    let MC_SCALE = 1; // Scaling of our entire Magic Circle
+    
+    // Keep track of the distances from the origin for each vertex
+    let listRadius = [];
+    loop(NUM_VERTEX) {
+        listRadius = listRadius ~ [0];
+    }
+    // Create our primitive
+    let objCirc = ObjPrim_Create(OBJ_PRIMITIVE_2D);
+    ObjPrim_SetTexture(objCirc, imgpath); // Set the texture.
+    ObjPrim_SetPrimitiveType(objCirc, PRIMITIVE_TRIANGLESTRIP);
+    ObjPrim_SetVertexCount(objCirc, NUM_VERTEX);
+    ObjRender_SetScaleXYZ(objCirc, MC_SCALE, MC_SCALE, 1);
+    // When using a Triangle Strip for a ring structure, every pair of vertices must alternate outer then inner
+    // v0 (outer) - v1 (inner) - v2 (outer) forms a triangle. 
+    // Adding v3 (inner) adds a triangle with v1 and v2, resulting in a quadrilateral with vertices v0..3
+    // This pattern is repeated for the entire structure
+    ascent(iVert in 0..NUM_VERTEX / 2){
+        let left = iVert * 240/NUM_VERTEX; // 240 is the length of the texture I am currently using
+        let indexVert = iVert * 2; // indexVert refers to a PAIR of vertices
+        // 125 and 141 are the y coordinates for the part of the texture I want to use. 
+        // Even vertices are 'outer' and Odd vertices are 'inner' in this case.
+        ObjPrim_SetVertexUVT(objCirc, indexVert + 0, left, 125);
+        ObjPrim_SetVertexUVT(objCirc, indexVert + 1, left, 141);
+    }
+    // To have our magic circle rotate and handle control over time, we provide an angle and a counter
+    let angleRender = 0;
+    // The magic circle exists as long as the boss does
+    while(!Obj_IsDeleted(objBoss)) {
+        angleRender += 360 / NUM_VERTEX / 8; // Last number is best way to control rotation speed. Lower is faster
+        Obj_SetVisible(objCirc, true);
+        // Similar to when we set the UV (Texture) coordinates
+        ascent(iVert in 0..NUM_VERTEX / 2) {
+            // Set vertex positions for current iteration of loop
+            let indexVert = iVert * 2;
+            // The '- 1' for the angle is since we must duplicate a pair of vertices. 
+            // So if we have 32 vertices, only 15 edges will be formed.
+            let angle = 360 / (NUM_VERTEX / 2 - 1) * iVert;
+            // listRadius stores the current distance from the position of the render object to the position of each vertex. 
+            let vx1 = listRadius[indexVert] * cos(angle);
+            let vy1 = listRadius[indexVert] * sin(angle);
+            ObjPrim_SetVertexPosition(objCirc, indexVert + 0, vx1, vy1, 0);
+            let vx2 = listRadius[indexVert+1] * cos(angle);
+            let vy2 = listRadius[indexVert+1] * sin(angle);
+            ObjPrim_SetVertexPosition(objCirc, indexVert + 1, vx2, vy2, 0);
+            // Calculate vertex positions for next iteration of loop
+            // First, animate expansion of outer vertices
+            // Note that once listRadius[indexVert] reaches MC_RADIUS, listRadius for the vertex remains the same.
+            let drOut = (MC_RADIUS - listRadius[indexVert]) / 8;
+            listRadius[indexVert] = listRadius[indexVert] + drOut;
+            // Next, animate expansion of inner vertices
+            // rRateIn controls the width of magic circle. 
+            // Values are a factor of MC_RADIUS. Value of 1 is very thin; value of 0 has inner vertices at position of magic circle
+            let rRateIn = 1 - 0.12;
+            let drIn = (MC_RADIUS * rRateIn - listRadius[indexVert + 1]) / 8;
+            listRadius[indexVert + 1] = listRadius[indexVert + 1] + drIn;
+        }
+        // Update position and angle of magic circle as a whole
+        ObjRender_SetPosition(objCirc, ObjRender_GetX(objBoss), ObjRender_GetY(objBoss), 1);
+        ObjRender_SetAngleZ(objCirc, angleRender);
+        yield;
+    }
+    // Delete the magic circle.
+    Obj_Delete(objCirc);
+}
+

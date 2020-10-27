@@ -1,0 +1,27 @@
+
+function GetCenterX(){
+    return GetStgFrameWidth() / 2;
+}
+function GetCenterY(){
+    return GetStgFrameHeight() / 2;
+}
+function wait(n){
+     loop(n){yield;}
+}
+
+function GetEnemyX(obj) {
+    let ex = ObjMove_GetX(obj);
+    return ex;
+}
+
+function GetEnemyY(obj) {
+    let ey = ObjMove_GetY(obj);
+    return ey;
+}
+
+/* *************************************************************************
+*void WaitForZeroEnemy() -- Waits for there to be no enemies on screen
+************************************************************************* */
+function WaitForZeroEnemy(){ //ULTIMA
+    while(length(GetAllEnemyID()) > 0){yield;}
+}

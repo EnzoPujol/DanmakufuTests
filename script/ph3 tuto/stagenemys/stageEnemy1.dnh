@@ -1,0 +1,66 @@
+#include "../lib/lib_general.dnh"
+#include "../system/Default_ShotConst.txt"
+
+//Code from the Sparen's tutorial
+
+function CreateStageEnemy1(x, y, speedE, angleE) {
+    let count = 0; //Counter
+    let Xmin = -32;
+    let Xmax = GetStgFrameWidth + 32;
+    let Ymin = -32; 
+    let Ymax = GetStgFrameHeight + 32;
+    let objEnemy;
+    TInitialize;
+    task TDrawLoop (obj) {
+      let img = GetCurrentScriptDirectory() ~ "/ExRumia.png";
+      ObjPrim_SetTexture(obj, img);
+      ObjSprite2D_SetSourceRect(obj, 0, 1, 63, 64);
+      ObjSprite2D_SetDestCenter(obj);
+
+    }
+    task TInitialize {
+        objEnemy = ObjEnemy_Create(OBJ_ENEMY);
+        ObjEnemy_Regist(objEnemy);
+        ObjEnemy_SetLife(objEnemy, 200);
+        ObjEnemy_SetDamageRate(objEnemy, 130, 200);
+        ObjMove_SetPosition(objEnemy, x, y);
+        ObjMove_SetAngle(objEnemy, angleE);
+        ObjMove_SetSpeed(objEnemy, speedE);
+        TDrawLoop(objEnemy);
+        TMainLoop;
+        TFinalize;
+    }
+
+    task movement (obj) {
+        
+        while (ObjEnemy_GetInfo(obj, INFO_LIFE) > 0) {
+            ObjMove_SetDestAtFrame(obj, 400, 400, 120);
+            ObjMove_AddPatternA1(obj, 150, speedE, GetAngleToPlayer(obj));
+  
+            yield;      
+        }
+    }
+    task TMainLoop {
+        while(ObjEnemy_GetInfo(objEnemy, INFO_LIFE) > 0) {
+            ObjEnemy_SetIntersectionCircleToShot(objEnemy, ObjMove_GetX(objEnemy), ObjMove_GetY(objEnemy), 32); 
+            ObjEnemy_SetIntersectionCircleToPlayer(objEnemy, ObjMove_GetX(objEnemy), ObjMove_GetY(objEnemy), 8);
+            movement(objEnemy);
+            if (count == 30) {bulletA;}
+            if (GetEnemyX(objEnemy) < Xmin || GetEnemyX(objEnemy) > Xmax || GetEnemyY(objEnemy) < Ymin || GetEnemyY(objEnemy) > Ymax) {
+                ObjEnemy_SetLife(objEnemy, -1000);
+            }
+            count++;
+            yield;
+        }
+    }
+    task bulletA{
+        while(ObjEnemy_GetInfo(objEnemy, INFO_LIFE) > 0) {
+            CreateShotA1(GetEnemyX(objEnemy), GetEnemyY(objEnemy), 2, GetAngleToPlayer(objEnemy), DS_KUNAI_BLUE, 0.5);
+            wait(30);
+        }
+    }
+    task TFinalize {
+        while(ObjEnemy_GetInfo(objEnemy, INFO_LIFE) > 0) {yield;}
+        Obj_Delete(objEnemy);
+    }
+}

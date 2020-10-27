@@ -1,0 +1,79 @@
+#TouhouDanmakufu[Plural]
+#ScriptVersion[3]
+#System["./system/Default_System.dnh"]
+#Title["My First Plural!"]
+#Text[" Code by xChumbo. [r] Scripting"]
+//#BGM["script/ph3 tuto/music/Second Level - ph3 tutorial.ogg"]
+
+@Event {
+  alternative (GetEventType())
+  case (EV_TIMEOUT) {
+    AddScore(-100000);
+  }
+  case (EV_PLAYER_SHOOTDOWN){
+    SetForbidPlayerShot(true);
+  }
+  case (EV_PLAYER_REBIRTH){
+    SetForbidPlayerShot(false);
+  }
+  
+}
+
+@Initialize {
+  TPlural;
+  //RenderBG;
+}
+
+@MainLoop {
+  yield;
+}
+
+task TPlural {
+  let dir = GetCurrentScriptDirectory();
+  let obj = ObjEnemyBossScene_Create();
+
+  ObjEnemyBossScene_Add(obj, 0, dir ~ "/Script 1 - Level 1 - Stage 1.dnh");
+  if (GetCommonData("Difficulty", 1) == 1) {
+    ObjEnemyBossScene_Add(obj, 1, dir ~ "/Script 2 - Level 1 - Stage 1.dnh");
+  }
+  if (GetCommonData("Difficulty", 1) == 2){
+     ObjEnemyBossScene_Add(obj, 2, dir ~ "/Script 3 - Level 1 - Stage 1.dnh");
+     ObjEnemyBossScene_Add(obj, 3, dir ~ "/Script 4 - Level 1 - Stage 1.dnh");
+  }
+  
+ 
+
+  ObjEnemyBossScene_LoadInThread(obj);
+  ObjEnemyBossScene_Regist(obj);
+  while(!Obj_IsDeleted(obj)){
+    yield;
+  }
+  CloseScript(GetOwnScriptID());
+}
+
+/*task RenderBG {
+  let obj = ObjPrim_Create(OBJ_SPRITE_2D);
+  let imgpath = GetCurrentScriptDirectory() ~ "./background/u2l13sample.png";
+
+  ObjPrim_SetTexture(obj, imgpath);
+  ObjSprite2D_SetSourceRect(obj, 0, 1, 383, 448); //alternatively, 0, 0, 384, 448
+  ObjSprite2D_SetDestRect(obj, 0, 0, 384, 448);
+  ObjRender_SetPosition(obj, 0, 0, 0); //move it to the top left corner of the screen
+
+}*/
+
+/*function CreateTrack {
+  let obj = ObjSound_Create();
+  ObjSound_Load(obj, GetCurrentScriptDirectory() ~ "/music/Third Level.ogg");
+  ObjSound_SetSoundDivision(obj, SOUND_BGM);
+  ObjSound_SetLoopEnable(obj, true);
+  ObjSound_SetLoopTime(obj, 1.90, 47.26);
+  return obj;
+}*/
+
+/*function playBulletSound {
+  let obj = ObjSound_Create();
+  ObjSound_Load(obj, GetCurrentScriptDirectory() ~ DIRECTORIO DEL SONIDO DE BALA)
+  objSound_SetSoundDivision(obj, SOUND_SE)
+  return obj;
+}*/

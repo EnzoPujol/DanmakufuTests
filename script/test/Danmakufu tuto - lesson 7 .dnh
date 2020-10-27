@@ -1,0 +1,105 @@
+#TouhouDanmakufu[Single]
+#ScriptVersion[3]
+#Title["My First Danmakufu Script!"]
+#Text["Code by xChumbo. [r] My First BH!"] 
+#BGM["script/ph3 tuto/music/First Level - ph3 tutorial.mp3"]
+
+#include "script/default_system/Default_ShotConst.txt"
+
+let objBoss;
+let objScene = GetEnemyBossSceneObjectID();
+
+@Event{
+    alternative(GetEventType())
+    case(EV_REQUEST_LIFE){
+        SetScriptResult(2000);
+    }
+    case(EV_REQUEST_TIMER){
+        SetScriptResult(60);
+    }
+    case(EV_REQUEST_SPELL_SCORE){
+        SetScriptResult(1000000);
+    }
+}
+@Initialize{
+    objBoss = ObjEnemy_Create(OBJ_ENEMY_BOSS);
+    ObjEnemy_Regist(objBoss);
+    
+    ObjMove_SetDestAtFrame(objBoss, GetCenterX(), 60, 60);
+
+    ObjEnemyBossScene_StartSpell(objScene);
+
+    TDrawLoop;
+    TFinalize;
+    MainTask;
+}
+
+task TDrawLoop {
+    let imgExRumia = GetCurrentScriptDirectory() ~ "ExRumia.png";
+    ObjPrim_SetTexture(objBoss, imgExRumia);
+    ObjSprite2D_SetSourceRect(objBoss, 64, 1, 127, 64);
+    ObjSprite2D_SetDestCenter(objBoss);
+}
+@MainLoop{
+    ObjEnemy_SetIntersectionCircleToShot(objBoss, ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 32); 
+    ObjEnemy_SetIntersectionCircleToPlayer(objBoss, ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 24);
+    yield;
+}
+task MainTask{
+    wait(120);
+    movement;
+    shotFan;
+    shotStackedRings;
+}
+task TFinalize {
+    while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){yield;}
+    if(ObjEnemyBossScene_GetInfo(objScene, INFO_PLAYER_SHOOTDOWN_COUNT)
+        + ObjEnemyBossScene_GetInfo(objScene, INFO_PLAYER_SPELL_COUNT) == 0){
+    AddScore(ObjEnemyBossScene_GetInfo(objScene, INFO_SPELL_SCORE));
+    }
+    Obj_Delete(objBoss);
+    DeleteShotAll(TYPE_ALL, TYPE_IMMEDIATE);
+    SetAutoDeleteObject(true);
+    CloseScript(GetOwnScriptID());
+    return;
+}
+
+task movement{
+    while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+        ObjMove_SetDestAtFrame(objBoss, rand(GetCenterX + 90, GetCenterX - 90), rand(GetCenterY - 60, GetCenterY - 120), 60);
+        wait(240);
+    }
+}
+task shotFan{
+    while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+        let angleT = GetAngleToPlayer(objBoss);
+        ascent(i in -1..2){
+            ascent(j in 0..3){
+                CreateShotA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 3 - j/6, angleT + i*15, DS_RICE_M_SKY, 5);
+            }
+        }
+        wait(120);
+    }
+}
+task shotStackedRings{
+    while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+        let angleT = GetAngleToPlayer(objBoss);
+        loop(13){
+            ascent(i in 0..3){
+                CreateShotA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 2.5 - i/3, angleT, DS_BALL_S_RED + i, 5);
+            }
+            angleT += 360/13;
+        }
+        wait(30);
+    }
+}
+
+function GetCenterX(){
+    return GetStgFrameWidth() / 2;
+}
+function GetCenterY(){
+    return GetStgFrameHeight() / 2;
+}
+function wait(n){
+     loop(n){yield;}
+}

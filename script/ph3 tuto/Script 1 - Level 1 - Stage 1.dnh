@@ -1,0 +1,297 @@
+#TouhouDanmakufu[Single]
+#ScriptVersion[3]
+#System["./system/Default_System.dnh"]
+#Title["First Level - Rumia Test"]
+#Text["Code by xChumbo. [r] Scripting"] 
+
+
+#include "script/default_system/Default_ShotConst.txt"
+#include "./lib/lib_general.dnh"
+
+let objBoss;
+let objScene = GetEnemyBossSceneObjectID();
+
+@Event{
+    alternative(GetEventType())
+    case(EV_REQUEST_LIFE){
+        SetScriptResult(2000);
+    }
+    case(EV_REQUEST_TIMER){
+        SetScriptResult(60);
+    }
+    case(EV_REQUEST_SPELL_SCORE){
+        SetScriptResult(1000000);
+    }
+}
+@Initialize{
+    objBoss = ObjEnemy_Create(OBJ_ENEMY_BOSS);
+    ObjEnemy_Regist(objBoss);
+
+    LifeExtendGraphic;
+
+    ObjMove_SetDestAtFrame(objBoss, GetCenterX(), 60, 60);
+
+    ObjEnemyBossScene_StartSpell(objScene);
+
+    TDrawLoop;
+    TFinalize;
+    MainTask;
+}
+
+task TDrawLoop {
+    let imgExRumia = GetCurrentScriptDirectory() ~ "./images/ExRumia.png";
+    ObjPrim_SetTexture(objBoss, imgExRumia);
+    ObjSprite2D_SetSourceRect(objBoss, 64, 1, 127, 64);
+    ObjSprite2D_SetDestCenter(objBoss);
+}
+@MainLoop{
+    ObjEnemy_SetIntersectionCircleToShot(objBoss, ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 32); 
+    ObjEnemy_SetIntersectionCircleToPlayer(objBoss, ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 24);
+    yield;
+}
+task MainTask{
+    wait(120);
+    movement;
+    shotHomingRing;
+    shootExplosiveBullet;
+}
+task TFinalize {
+    while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){yield;}
+    if(ObjEnemyBossScene_GetInfo(objScene, INFO_PLAYER_SHOOTDOWN_COUNT)
+        + ObjEnemyBossScene_GetInfo(objScene, INFO_PLAYER_SPELL_COUNT) == 0){
+    AddScore(ObjEnemyBossScene_GetInfo(objScene, INFO_SPELL_SCORE));
+    }
+    NotifyEventAll(EV_USER_STAGE+2, [ObjMove_GetX(objBoss), ObjMove_GetY(objBoss)]);
+    //Calls the event that gives you point items from the defeated boss 
+    Obj_Delete(objBoss);
+    DeleteShotAll(TYPE_ALL, TYPE_IMMEDIATE);
+    SetAutoDeleteObject(true);
+    CloseScript(GetOwnScriptID());
+    return;
+}
+
+task movement{
+    /*while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+        ObjMove_SetDestAtFrame(objBoss, rand(GetCenterX + 90, GetCenterX - 90), rand(GetCenterY - 60, GetCenterY - 120), 60);
+        wait(240);
+    }*/
+    let moveX = ObjMove_GetX(objBoss) - 60;
+    let moveY = 60;
+    wait(120);
+    ObjMove_SetDestAtFrame(objBoss, moveX, moveY, 60);
+    while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+        wait(30);
+        ObjMove_SetDestAtFrame(objBoss, moveX + 400, moveY, 90);
+        wait(30);
+        ObjMove_SetDestAtFrame(objBoss, moveX - 400, moveY, 90);
+    }
+}
+task shotFan{
+    while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+        let angleT = GetAngleToPlayer(objBoss);
+        ascent(i in -1..2){
+            ascent(j in 0..3){
+                CreateShotA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 3 - j/6, angleT + i*15, DS_RICE_M_SKY, 5);
+            }
+        }
+        wait(120);
+    }
+}
+task shotStackedRings{
+    while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+        let angleT = GetAngleToPlayer(objBoss);
+        loop(13){
+            ascent(i in 0..3){
+                //if (ObjEnemy_GetInfo(objBoss, INFO_LIFE <= 0)) {return;} 
+                CreateShotA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 2.5 - i/3, angleT, DS_NEEDLE_RED + i, 5);
+            }
+            angleT += 360/13;
+        }
+        wait(30);
+    }
+}
+
+task ChangeDirectionToPlayer(bullet){
+    wait(30);
+    ObjMove_SetAngle(bullet, GetAngleToPlayer(bullet));
+}
+
+task shotHomingRing {
+    while (ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0 ){
+        let angle = rand(0, 360);
+        loop (6) {
+            let obj = CreateShotA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 2, angle, DS_COIN_RED, 0);
+            ChangeDirectionToPlayer(obj);
+            angle += 360/6;
+        }
+        wait(90);
+    }
+}
+
+task explode(bullet) {
+    wait(60);
+    let angleT = rand(0, 360);
+    loop (12) {
+        CreateShotA2(ObjMove_GetX(bullet), ObjMove_GetY(bullet), 0, angleT, 1, 4, DS_COIN_BLUE, 3);
+        angleT += 360/12;
+    }
+    Obj_Delete(bullet);
+}
+task shootExplosiveBullet {
+    while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+        let objS = CreateShotA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 2, GetAngleToPlayer(objBoss), DS_SCALE_BLUE, 10);
+        explode(objS);
+        wait(30);
+    }
+}
+
+task shootLaserRing {
+    while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+        let angleT = GetAngleToPlayer(objBoss);
+        loop (12){
+            let obj = CreateLooseLaserA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 3, angleT, 75, 18, DS_BALL_M_BLUE, 0);
+            angleT += 360/12;
+        }
+        wait(30);
+    }
+}
+
+task DelayLaser(x, y, ang, l, w, dt, graph, delay){ 
+    let objlaser = CreateStraightLaserA1(x, y, ang, l, w, dt, graph, delay);
+    ObjStLaser_SetSource(objlaser, false);
+    loop(delay-1){//So that the graphic never enlarges. 
+        if(ObjEnemy_GetInfo(objBoss, INFO_LIFE) <= 0){
+            Obj_Delete(objlaser); 
+            return;
+        }
+        yield;
+    }
+    Obj_Delete(objlaser);
+}
+
+task shootCurveLaser {
+    while (ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0) {
+        //let objLaser = CreateLooseLaserA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 4, GetAngleToPlayer(objBoss), 60, 18, DS_BALL_M_BLUE, 1);
+            let angleT = GetAngleToPlayer(objBoss);
+            loop (15) {
+                let objLaser = CreateCurveLaserA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 4, angleT, 60, 18, DS_BALL_M_BLUE, 1);
+                ObjCrLaser_SetTipDecrement(objLaser, 0);
+                angleT += 360/15;
+                ObjMove_SetAngularVelocity(objLaser, 0.5);
+                wait(30);
+                ObjMove_SetAngularVelocity(objLaser, 0);
+                wait(10);
+                ObjMove_SetAngle(objLaser, GetAngleToPlayer(objLaser));
+                
+            }
+            wait(30);
+
+    }
+}
+
+task fireMoonlightLaser(dir){ //no funciona bien (por ahora)
+        let obj = CreateStraightLaserA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 270 + 105*dir, 512, 36, 120, DS_BEAM_BLUE, 30);
+        ascent(i in 0..120){
+            ObjStLaser_SetAngle(obj, 270 + 105*dir + 60/120*i * dir);
+            yield;
+	}
+}
+
+task BulletRing {
+    while (ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+        let angleT = 9;
+        loop (30) {
+            CreateShotA1(ObjMove_GetX(objBoss) + 90*cos(angleT), ObjMove_GetY(objBoss) + 90*sin(angleT), 2, angleT, 1, 0);
+            angleT += 360/30;
+        }
+        wait(30);
+    }
+}
+
+task BulletElipse{
+    while (ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+            let angleT = 0;
+            loop (30) {
+                CreateShotA1(ObjMove_GetX(objBoss) + 75*cos(angleT), ObjMove_GetY(objBoss) + 30*sin(angleT), 2, angleT, 1, 0);
+                angleT += 360/30;
+            }
+            wait(30);
+    }
+
+}
+
+task AstroidRing {
+    while (ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+            let angleT = 0;
+            loop (60) {
+                CreateShotA1(ObjMove_GetX(objBoss) + 120*cos(angleT) ^ 3, ObjMove_GetY(objBoss) + 120*sin(angleT) ^ 3, 2, angleT, 1, 0);
+                angleT += 360/60;
+            }
+            wait(30);
+    }
+}
+
+task BoWaP {
+    let angleT = rand(0, 360);
+    let objcount = 0;
+    loop {
+        loop (5) {
+            let obj = CreateShotA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 3, angleT, DS_BALL_SS_YELLOW, 5);
+            angleT += 360/5;
+        }
+        angleT += sin(objcount) * 6; //BOWAP
+        objcount++;
+        yield;
+    }
+}
+
+task BoWaP2 {
+    let angleT = rand(0, 360);
+    let objcount = 0;
+    loop {
+        loop (5) {
+            let obj = CreateShotA1(ObjMove_GetX(objBoss), ObjMove_GetY(objBoss), 3, angleT, DS_BALL_SS_YELLOW, 5);
+            angleT += 360/5;
+        }
+        angleT += sin(objcount) * cos(objcount) * 12; //BOWAP
+        objcount++;
+        wait(5);
+    }
+}
+
+task LifeExtendGraphic{
+        let objText = ObjText_Create();
+        ObjText_SetText(objText, "EXTEND!");
+        ObjText_SetFontSize(objText, 24);
+        ObjText_SetFontType(objText, "MS Gothic");
+        ObjText_SetFontBold(objText, false);
+        ObjText_SetFontColorTop(objText, 255, 224, 255);
+        ObjText_SetFontColorBottom(objText, 240, 208, 240);
+        ObjText_SetFontBorderType(objText, BORDER_FULL);
+        ObjText_SetFontBorderColor(objText, 192, 96, 192);
+        ObjText_SetFontBorderWidth(objText, 2);
+        ObjText_SetHorizontalAlignment(objText, ALIGNMENT_CENTER);
+        ObjText_SetMaxWidth(objText, 360);
+        Obj_SetRenderPriority(objText, 0.6);
+        ObjRender_SetX(objText, 192 - 180);
+        //Minus half the max width. 192 = 384/2 (384 is GetStgFrameWidth w/ r.p.<80)
+	ObjRender_SetY(objText, 75);
+        loop(120){
+		yield;
+        }
+        Obj_Delete(objText);
+}
+
+function createText(text) {
+    let objText = ObjText_Create();
+    ObjText_SetText(objText, text);
+    ObjText_SetFontSize(objText, 24);
+    ObjText_SetFontType(objText, "Helvetica");
+    ObjText_SetFontBold(objText, true);
+    ObjText_SetFontColorTop(objText, 255, 255, 255);
+    ObjText_SetFontColorBottom(objText, 255, 255, 255);
+    ObjText_SetFontBorderType(objText, BORDER_FULL);
+    ObjText_SetFontBorderColor(objText, 224, 64, 192);
+    ObjText_SetFontBorderWidth(objText, 1);
+    return objText;
+}

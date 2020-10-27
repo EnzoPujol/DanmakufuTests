@@ -1,0 +1,217 @@
+#TouhouDanmakufu[Stage]
+#ScriptVersion[3]
+#System["./system/Default_System.dnh"]
+#Title["Test Stage 1"]
+#Text["First stage test. [r] Scripting."]
+#Image["./ExRumia(星符「ミッドナイトレヴァリエ」).jpg"]
+#Background["./system/Background.dnh"]
+
+#include "./lib/lib_general.dnh"
+#include "./stagenemys/stageEnemy1.dnh"
+
+let bgm1 = ObjSound_Create();
+let bgm2 = ObjSound_Create();
+//Player initial position
+let px = GetPlayerX(); 
+let py = GetPlayerY();
+//------------------------
+let current = GetCurrentScriptDirectory();
+let player = GetPlayerObjectID();
+
+let stagepart = 0;
+
+
+
+@Event {
+  alternative (GetEventType())
+  case (EV_PAUSE_ENTER) {
+    if (stagepart == 0){
+      ObjSound_Stop(bgm1);
+    }
+    if (stagepart == 1){
+      ObjSound_Stop(bgm2);
+    }
+  }
+  case (EV_PAUSE_LEAVE) {
+    if (stagepart == 0){
+      ObjSound_Play(bgm1);
+    }
+    if (stagepart == 1){
+      ObjSound_Play(bgm2);
+    }
+  }
+  case(EV_USER_STAGE+1){ //Generic Spell point drop
+    let arg = GetEventArgument(0); //x, y
+    let item = CreateItemA1(ITEM_POINT, arg[0], arg[1], 15000);
+    ObjItem_SetDefinedMovePatternA1(item, ITEM_MOVE_DOWN);
+    ObjItem_SetAutoCollectEnable(item, true);
+  }
+  case(EV_USER_STAGE+2){
+    let arg = GetEventArgument(0);
+    ascent (i in 0..12) {
+      let item = CreateItemA1(ITEM_POINT, arg[0] + 30*cos(30*i), arg[1] + 30*sin(30*i), 15000);
+      ObjItem_SetDefinedMovePatternA1(item, ITEM_MOVE_DOWN);
+      SetPlayerAutoItemCollectLine(200);
+      ObjItem_SetAutoCollectEnable(item, true);
+    }
+  }
+}
+@Initialize
+{
+	TStage();
+}
+
+@MainLoop
+{
+  yield;
+}
+
+@Finalize
+{
+}
+
+task TStage {
+  SetForbidPlayerSpell(true);
+  
+  SetStageDifficulty;
+
+  SetForbidPlayerSpell(false);
+
+  
+  ObjSound_Load(bgm1, current ~ "./music/Third Level.ogg");
+  StageBGM(bgm1, 1);
+  ObjSound_Load(bgm2, current ~ "./music/Second level.ogg");
+  StageBGM(bgm2, 2);
+  ObjSound_Play(bgm1);
+
+  //The idea is to create the stage enemies here, before the boss
+  ascent (i in 0..5) {
+    CreateStageEnemy1(-1 + (40*i), 200, 1, 0);
+  }
+  
+
+  WaitForZeroEnemy();
+
+  stagepart = 1;
+  
+  ObjSound_Stop(bgm1);
+  wait(60);
+
+  let pathboss;
+  
+   //Load the Boss
+  pathboss = current ~ "./Level 1 - Stage 1.dnh";
+  
+  let bossScript = LoadScriptInThread(pathboss);
+  wait(30);
+  StartScript(bossScript);
+
+  
+  
+  ObjSound_Play(bgm2);
+
+  //Handle boss script
+  while(!IsCloseScript(bossScript) && GetPlayerState() != STATE_END)
+  {
+    yield;
+  }
+	//Just waiting。
+  
+	loop(240){yield;}
+
+    //Closes the stage
+	CloseStgScene();
+}
+
+
+function StageBGM (obj, ID) {
+  ObjSound_SetSoundDivision(obj, SOUND_BGM);
+  ObjSound_SetRestartEnable(obj, true);
+  ObjSound_SetLoopEnable(obj, true);
+  if (ID == 1){
+    ObjSound_SetLoopTime(obj, 1.90, 47.26);
+  }
+  if (ID == 2){
+    ObjSound_SetLoopTime(obj, 0, 98.81);
+  }
+  ObjSound_SetVolumeRate(obj, 55);
+  return obj;
+  
+}
+
+function CreateTextObject (text) {
+  let obj = ObjText_Create();
+  ObjText_SetText(obj, text);
+  ObjText_SetFontSize(obj, 20);
+	ObjText_SetFontBold(obj, true);
+	ObjText_SetFontColorTop(obj, 128, 128, 255);
+	ObjText_SetFontColorBottom(obj, 64, 64, 255);
+	ObjText_SetFontBorderType(obj, BORDER_FULL);
+	ObjText_SetFontBorderColor(obj,255, 255, 255);
+	ObjText_SetFontBorderWidth(obj, 2);
+	Obj_SetRenderPriorityI(obj, 10);
+
+  return obj;
+}
+//------------------------------------------
+//Setting stage difficulty - code by Sparen (tutorial - lesson 24) with some modifications
+
+function SetStageDifficulty{ //Adapted from code used by gtbot
+    let selection = 0; //Initialize the player's selection to index 0
+    let sdiff = 0; //Selected difficulty
+	
+    let TextObjects = []; //Container for text objects, so that we can delete them at the end of the function
+    let TextNames = ["Normal", "Hard"]; //Supported difficulties (text only)
+	
+    let diffs = [1, 2]; //Define the values (CommonData) to utilize 
+    let Center = [GetStgFrameWidth()/2, GetStgFrameHeight()/2]; //Define the center of the playing field
+    ascent(i in 0..length(TextNames)){ //For each difficulty option, handle the text object
+        TextObjects = TextObjects ~ [CreateTextObject(TextNames[i])]; //Add the Text object to the array
+        let locText = TextObjects[i]; //Retrieve text contents
+        ObjText_SetHorizontalAlignment(locText, ALIGNMENT_CENTER);
+        ObjRender_SetPosition(locText, Center[0] - 100, Center[1] - 150 + i*25, 0);
+        ObjText_SetMaxWidth(locText, 200);
+        ObjText_SetFontSize(locText, 16);//new
+        ObjText_SetFontType(locText, "Helvetica");
+        ObjText_SetFontBorderColor(locText, 16, 16, 16);
+    }
+	
+    let r = [255, 255];
+    let g = [255, 255];
+    let b = [255, 255];
+    //Infinite Loop that runs until the player has made a selection.
+    loop{
+        //Menu controls
+        if(GetVirtualKeyState(VK_UP) == KEY_PUSH){
+          selection--;
+          }
+        if(GetVirtualKeyState(VK_DOWN) == KEY_PUSH){
+          selection++;
+          }
+        ObjMove_SetPosition(player, px, py); //Prevents the player to move while the menu is on
+        if(selection < 0){selection = 1;}
+        if(selection > 1){selection = 0;}
+        //Make it clear to the player which option is selected
+        ascent(i in 0..length(TextObjects)){
+            if(selection == i){
+                ObjText_SetFontColorTop(TextObjects[i], r[i], g[i], b[i]);
+                ObjText_SetFontColorBottom(TextObjects[i], r[i]/1.5, g[i]/1.5, b[i]/1.5);
+            } else {
+                ObjText_SetFontColorTop(TextObjects[i], r[i]/1.75, g[i]/1.75, b[i]/1.75);
+                ObjText_SetFontColorBottom(TextObjects[i], r[i]/2.25, g[i]/2.25, b[i]/2.25);
+            }
+        }
+        //Handle setting Common Data here
+        //SEE BELOW
+        if(GetVirtualKeyState(VK_SHOT) == KEY_PUSH){
+            sdiff = diffs[selection];
+            SetCommonData("Difficulty", sdiff); //Set the CommonData here
+            break;
+        }
+	
+        yield;
+    }
+    ascent(i in 0..length(TextObjects)){
+        Obj_Delete(TextObjects[i]);
+    }
+}
